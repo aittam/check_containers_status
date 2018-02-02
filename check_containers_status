@@ -9,7 +9,7 @@
 import docker
 import sys
 
-RETCOD = { "OK": 0, "WARNING": 1, "CRITICAL": 2}
+RETCOD = { "OK": 0, "WARNING": 1, "CRITICAL": 2, "UNKNOWN": 3}
 
 def get_containers(client, status="running"):
     """ get all containers in the given status """
@@ -17,26 +17,43 @@ def get_containers(client, status="running"):
 
 def main():
 
-    client = docker.from_env()
-
     result = RETCOD["OK"]
+    containers_running = -1
+    containers_exited= -1
+    containers_restarting = -1
 
-    containers_running = len(get_containers(client, "running"))
+    try:
+        client = docker.from_env()
 
-    containers_restarting = len(get_containers(client, "restarting"))
-    if containers_restarting > 0:
-        result = RETCOD["WARNING"]
+        containers_running = len(get_containers(client, "running"))
 
-    containers_exited = len(get_containers(client, "exited"))
-    if containers_exited > 0:
-        result = RETCOD["CRITICAL"]
+        containers_restarting = len(get_containers(client, "restarting"))
+        if containers_restarting > 0:
+            result = RETCOD["WARNING"]
 
-    print ("%s %s running_containers=%i %s - Containers Exited: %i, Restarting: %i" % (result,\
-                                                                      sys.argv[0].split("/")[-1],\
-                                                                      containers_running,\
-                                                                      RETCOD.keys()[RETCOD.values().index(result)],\
-                                                                      containers_exited,\
-                                                                      containers_restarting)) 
+        containers_exited = len(get_containers(client, "exited"))
+        if containers_exited > 0:
+            result = RETCOD["CRITICAL"]
+    except:
+        result = RETCOD["UNKNOWN"]
+
+    message = ""
+    if result == RETCOD["UNKNOWN"]:
+        values = (result,\
+                  sys.argv[0].split("/")[-1],\
+                  RETCOD.keys()[RETCOD.values().index(result)])
+        message = "%i %s - %s - Some exceptions occured while running this \
+check. Can you connect to the docker daemon?" % values
+    else:
+        values = (result,\
+                  sys.argv[0].split("/")[-1],\
+                  containers_running,\
+                  RETCOD.keys()[RETCOD.values().index(result)],\
+                  containers_exited,\
+                  containers_restarting)
+        message = "%i %s running_containers=%i %s - Containers Exited: %i, Restarting: %i" % values
+
+    print (message)
 
     return 0
 
