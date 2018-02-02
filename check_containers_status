@@ -1,0 +1,45 @@
+#! /usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# :copyright: (c) 2018 by Mattia Lambertini.
+#
+# Check_MK local check to monitor docker containers' status. 
+# It monitors that all the containers are actually running and 
+# didn't exit or restarting.
+
+import docker
+import sys
+
+RETCOD = { "OK": 0, "WARNING": 1, "CRITICAL": 2}
+
+def get_containers(client, status="running"):
+    """ get all containers in the given status """
+    return client.containers.list(all=True,filters={"status": status})
+
+def main():
+
+    client = docker.from_env()
+
+    result = RETCOD["OK"]
+
+    containers_running = len(get_containers(client, "running"))
+
+    containers_restarting = len(get_containers(client, "restarting"))
+    if containers_restarting > 0:
+        result = RETCOD["WARNING"]
+
+    containers_exited = len(get_containers(client, "exited"))
+    if containers_exited > 0:
+        result = RETCOD["CRITICAL"]
+
+    print ("%s %s running_containers=%i %s - Containers Exited: %i, Restarting: %i" % (result,\
+                                                                      sys.argv[0].split("/")[-1],\
+                                                                      containers_running,\
+                                                                      RETCOD.keys()[RETCOD.values().index(result)],\
+                                                                      containers_exited,\
+                                                                      containers_restarting)) 
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
